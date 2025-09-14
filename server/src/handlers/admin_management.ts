@@ -1,52 +1,110 @@
+import { db } from '../db';
+import { adminsTable } from '../db/schema';
 import { type CreateAdminInput, type UpdateAdminInput, type Admin } from '../schema';
+import { eq } from 'drizzle-orm';
+import { createHash } from 'crypto';
 
 export async function createAdmin(input: CreateAdminInput): Promise<Admin> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a new admin account
-    // Should hash the password before storing in database
-    // Handle profile photo upload if provided
-    return Promise.resolve({
-        id: 0,
+  try {
+    // Hash the password
+    const password_hash = createHash('sha256').update(input.password + 'salt').digest('hex');
+
+    // Insert admin record
+    const result = await db.insert(adminsTable)
+      .values({
         name: input.name,
         username: input.username,
-        password_hash: 'hashed_password_placeholder',
-        profile_photo: input.profile_photo || null,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Admin);
+        password_hash,
+        profile_photo: input.profile_photo || null
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Admin creation failed:', error);
+    throw error;
+  }
 }
 
 export async function updateAdmin(input: UpdateAdminInput): Promise<Admin> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update existing admin account
-    // Should hash the password if password is being updated
-    // Handle profile photo update if provided
-    return Promise.resolve({
-        id: input.id,
-        name: input.name || 'Updated Name',
-        username: input.username || 'updated_username',
-        password_hash: 'updated_hashed_password_placeholder',
-        profile_photo: input.profile_photo || null,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Admin);
+  try {
+    // Build update values object, only including provided fields
+    const updateValues: any = {
+      updated_at: new Date()
+    };
+
+    if (input.name !== undefined) {
+      updateValues.name = input.name;
+    }
+
+    if (input.username !== undefined) {
+      updateValues.username = input.username;
+    }
+
+    if (input.password !== undefined) {
+      updateValues.password_hash = createHash('sha256').update(input.password + 'salt').digest('hex');
+    }
+
+    if (input.profile_photo !== undefined) {
+      updateValues.profile_photo = input.profile_photo;
+    }
+
+    // Update admin record
+    const result = await db.update(adminsTable)
+      .set(updateValues)
+      .where(eq(adminsTable.id, input.id))
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error('Admin not found');
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Admin update failed:', error);
+    throw error;
+  }
 }
 
 export async function getAdmins(): Promise<Admin[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch all admin accounts for admin list display
-    return [];
+  try {
+    const result = await db.select()
+      .from(adminsTable)
+      .execute();
+
+    return result;
+  } catch (error) {
+    console.error('Failed to fetch admins:', error);
+    throw error;
+  }
 }
 
 export async function getAdminById(adminId: number): Promise<Admin | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch specific admin details by ID
-    return Promise.resolve(null);
+  try {
+    const result = await db.select()
+      .from(adminsTable)
+      .where(eq(adminsTable.id, adminId))
+      .execute();
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('Failed to fetch admin by ID:', error);
+    throw error;
+  }
 }
 
 export async function deleteAdmin(adminId: number): Promise<boolean> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to delete an admin account by ID
-    // Should return true if deletion was successful, false otherwise
-    return Promise.resolve(false);
+  try {
+    const result = await db.delete(adminsTable)
+      .where(eq(adminsTable.id, adminId))
+      .returning()
+      .execute();
+
+    return result.length > 0;
+  } catch (error) {
+    console.error('Admin deletion failed:', error);
+    throw error;
+  }
 }
